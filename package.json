@@ -1,0 +1,12 @@
+{
+  "name": "ha-tv-remote",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Mobile-friendly TV remote Lovelace card for Home Assistant",
+  "scripts": {
+    "build": "esbuild src/tv-remote-card.js --bundle --minify --target=esnext --format=esm --outfile=dist/tv-remote-card.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0"
+  }
+}
