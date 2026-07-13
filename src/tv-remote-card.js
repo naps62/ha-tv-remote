@@ -1,4 +1,4 @@
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 
 const POWER_POLL_THROTTLE_MS = 800;
 const POWER_POLL_POST_TOGGLE_DELAYS = [1500, 3500, 6000];
@@ -296,20 +296,53 @@ class TvRemoteCard extends HTMLElement {
   }
 
   _launchItem(item) {
+    const e = this._config.entities;
+    const tv = this._hass.states[e.tv];
+    const reachable = tv && !["unavailable", "off"].includes(tv.state);
+    const onShield = reachable && this._config.shield_source
+      && tv.attributes?.source === this._config.shield_source;
+    const screenActive = this._screenOn !== false;
+
     if (item.kind === "source") {
-      this._hass.callService("media_player", "select_source",
-        { source: item.source },
-        { entity_id: this._config.entities.tv });
-    } else {
-      if (this._config.shield_source) {
-        this._hass.callService("media_player", "select_source",
-          { source: this._config.shield_source },
-          { entity_id: this._config.entities.tv });
+      // Switching a TV input goes through the webOS API. When the panel is
+      // blanked or on another input that API is often unreachable, so a Shield
+      // HOME press first asserts CEC active-source to wake the TV, then select.
+      const doSelect = () => this._hass.callService("media_player", "select_source",
+        { source: item.source }, { entity_id: e.tv });
+      if (reachable) {
+        doSelect();
+      } else {
+        this._cecWake();
+        setTimeout(doSelect, 1200);
       }
-      this._hass.callService("remote", "turn_on",
-        { activity: item.activity },
-        { entity_id: this._config.entities.remote });
+      return;
     }
+
+    // App launch. The launch always reaches the Shield, but the TV only shows
+    // it if the TV is awake and on the Shield input. When it isn't (blanked or
+    // on another HDMI) the webOS select_source can't help — the webOS API is
+    // unreachable — so wake via CEC (Shield HOME), same as the manual fix.
+    const launch = () => this._hass.callService("remote", "turn_on",
+      { activity: item.activity }, { entity_id: e.remote });
+
+    if (onShield && screenActive) {
+      launch();
+      return;
+    }
+    this._cecWake();
+    if (reachable && this._config.shield_source) {
+      this._hass.callService("media_player", "select_source",
+        { source: this._config.shield_source }, { entity_id: e.tv });
+    }
+    setTimeout(launch, 500);
+  }
+
+  _cecWake() {
+    // HOME on the Shield triggers HDMI-CEC one-touch-play: the TV powers on and
+    // switches to the Shield input over the CEC bus — works even when the TV's
+    // webOS (network) API is unreachable, which is why pressing Home recovers it.
+    this._hass.callService("remote", "send_command",
+      { command: "HOME" }, { entity_id: this._config.entities.remote });
   }
 
   _sendCommand(cmd) {
