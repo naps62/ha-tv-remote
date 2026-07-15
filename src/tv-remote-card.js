@@ -1,4 +1,4 @@
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 
 const POWER_POLL_THROTTLE_MS = 800;
 const POWER_POLL_POST_TOGGLE_DELAYS = [1500, 3500, 6000];
@@ -295,7 +295,20 @@ class TvRemoteCard extends HTMLElement {
     }
   }
 
+  _wakeScreen() {
+    // Panel blank via webostv turnOffScreen leaves media_player "on", so
+    // media_player.turn_on is a no-op. turnOnScreen is the exact inverse.
+    // Idempotent (no-op if already on); fire unconditionally — _screenOn is
+    // stale-true after a server-side blank until the next throttled poll.
+    this._hass.callService("webostv", "command", {
+      entity_id: this._config.entities.tv,
+      command: "com.webos.service.tvpower/power/turnOnScreen",
+    });
+    this._setScreenOn(true);
+  }
+
   _launchItem(item) {
+    this._wakeScreen();
     if (item.kind === "source") {
       this._hass.callService("media_player", "select_source",
         { source: item.source },
@@ -313,6 +326,7 @@ class TvRemoteCard extends HTMLElement {
   }
 
   _sendCommand(cmd) {
+    this._wakeScreen();
     this._hass.callService("remote", "send_command",
       { command: cmd },
       { entity_id: this._config.entities.remote });
@@ -413,6 +427,7 @@ class TvRemoteCard extends HTMLElement {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         if (pending == null) return;
+        this._wakeScreen();
         this._hass.callService("media_player", "volume_set",
           { volume_level: pending / 100 },
           { entity_id: this._config.entities.volume });
@@ -423,6 +438,7 @@ class TvRemoteCard extends HTMLElement {
       setTimeout(() => { this._volDragging = false; }, 400);
     });
     this.shadowRoot.querySelector("[data-mute]").addEventListener("click", () => {
+      this._wakeScreen();
       const volEnt = this._hass.states[this._config.entities.volume];
       const muted = !volEnt?.attributes?.is_volume_muted;
       this._hass.callService("media_player", "volume_mute",
