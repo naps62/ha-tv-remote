@@ -1,4 +1,4 @@
-const VERSION = "1.5.1";
+const VERSION = "1.5.2";
 
 const POWER_POLL_THROTTLE_MS = 800;
 const POWER_POLL_POST_TOGGLE_DELAYS = [1500, 3500, 6000];
@@ -332,8 +332,10 @@ class TvRemoteCard extends HTMLElement {
     }
   }
 
-  _sendCommand(cmd) {
-    this._wakeScreen();
+  // wake=false for the trackpad swipe: it repeats every REPEAT_MS, so waking
+  // per tick would fire turnOnScreen ~5x/sec. Pad taps still wake.
+  _sendCommand(cmd, wake = true) {
+    if (wake) this._wakeScreen();
     this._hass.callService("remote", "send_command",
       { command: cmd },
       { entity_id: this._config.entities.remote });
@@ -515,9 +517,9 @@ class TvRemoteCard extends HTMLElement {
     const startRepeat = (dir) => {
       clearRepeat();
       currentDir = dir;
-      this._sendCommand(DIR_CMD[dir]);
+      this._sendCommand(DIR_CMD[dir], false);
       repeatTimer = setInterval(() => {
-        if (currentDir) this._sendCommand(DIR_CMD[currentDir]);
+        if (currentDir) this._sendCommand(DIR_CMD[currentDir], false);
       }, REPEAT_MS);
     };
     const stopRepeat = () => { clearRepeat(); currentDir = null; };
