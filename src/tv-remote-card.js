@@ -1,4 +1,4 @@
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 
 const POWER_POLL_THROTTLE_MS = 800;
 const POWER_POLL_POST_TOGGLE_DELAYS = [1500, 3500, 6000];
@@ -298,12 +298,19 @@ class TvRemoteCard extends HTMLElement {
   _wakeScreen() {
     // Panel blank via webostv turnOffScreen leaves media_player "on", so
     // media_player.turn_on is a no-op. turnOnScreen is the exact inverse.
-    // Idempotent (no-op if already on); fire unconditionally — _screenOn is
-    // stale-true after a server-side blank until the next throttled poll.
-    this._hass.callService("webostv", "command", {
-      entity_id: this._config.entities.tv,
-      command: "com.webos.service.tvpower/power/turnOnScreen",
-    });
+    // Fire unconditionally — _screenOn is stale-true after a server-side blank
+    // until the next throttled poll. When the screen is already on webOS
+    // rejects with -102 "The current state must be Screen Off"; that's the
+    // no-op case, so suppress the toast (5th arg) and swallow the rejection.
+    this._hass
+      .callService(
+        "webostv",
+        "command",
+        { command: "com.webos.service.tvpower/power/turnOnScreen" },
+        { entity_id: this._config.entities.tv },
+        false,
+      )
+      .catch(() => {});
     this._setScreenOn(true);
   }
 
