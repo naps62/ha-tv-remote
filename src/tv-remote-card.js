@@ -462,11 +462,13 @@ class TvRemoteCard extends HTMLElement {
     const ctx = canvas.getContext("2d");
     const THRESHOLD = 80;
     const REPEAT_MS = 200;
+    const DOUBLE_TAP_MS = 200;
     let start = null;
     let last = null;
     let currentDir = null;
     let repeatTimer = null;
     let active = false;
+    let tapTimer = null;
     let px = 0, py = 0;
     let glow = 0;
     let raf = 0;
@@ -544,8 +546,6 @@ class TvRemoteCard extends HTMLElement {
       if (dir) {
         last = { x: e.clientX, y: e.clientY };
         if (dir !== currentDir) startRepeat(dir);
-      } else if (currentDir) {
-        stopRepeat();
       }
     });
     const release = (e) => {
@@ -554,7 +554,19 @@ class TvRemoteCard extends HTMLElement {
       if (start) {
         const dx = e.clientX - start.x;
         const dy = e.clientY - start.y;
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) this._sendCommand("DPAD_CENTER");
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+          if (tapTimer) {
+            clearTimeout(tapTimer);
+            tapTimer = null;
+            this._sendCommand("DPAD_CENTER");
+            this._sendCommand("DPAD_CENTER");
+          } else {
+            tapTimer = setTimeout(() => {
+              tapTimer = null;
+              this._sendCommand("DPAD_CENTER");
+            }, DOUBLE_TAP_MS);
+          }
+        }
       }
       start = null; last = null;
     };
