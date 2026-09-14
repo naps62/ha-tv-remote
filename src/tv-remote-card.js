@@ -334,11 +334,12 @@ class TvRemoteCard extends HTMLElement {
 
   // wake=false for the trackpad swipe: it repeats every REPEAT_MS, so waking
   // per tick would fire turnOnScreen ~5x/sec. Pad taps still wake.
-  _sendCommand(cmd, wake = true) {
+  _sendCommand(cmd, wake = true, holdSecs = 0) {
     if (wake) this._wakeScreen();
+    const data = { command: cmd };
+    if (holdSecs) data.hold_secs = holdSecs;
     this._hass.callService("remote", "send_command",
-      { command: cmd },
-      { entity_id: this._config.entities.remote });
+      data, { entity_id: this._config.entities.remote });
   }
 
   _togglePower() {
@@ -463,12 +464,16 @@ class TvRemoteCard extends HTMLElement {
     const THRESHOLD = 80;
     const REPEAT_MS = 200;
     const DOUBLE_TAP_MS = 200;
+    const LONG_PRESS_MS = 500;
+    const LONG_PRESS_HOLD_SECS = 0.5;
     let start = null;
     let last = null;
     let currentDir = null;
     let repeatTimer = null;
     let active = false;
     let tapTimer = null;
+    let longPressTimer = null;
+    let longPressFired = false;
     let px = 0, py = 0;
     let glow = 0;
     let raf = 0;
@@ -533,11 +538,25 @@ class TvRemoteCard extends HTMLElement {
       active = true;
       start = { x: e.clientX, y: e.clientY };
       last = { x: e.clientX, y: e.clientY };
+      longPressFired = false;
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        longPressFired = true;
+        this._sendCommand("DPAD_CENTER", true, LONG_PRESS_HOLD_SECS);
+        if (navigator.vibrate) navigator.vibrate(50);
+      }, LONG_PRESS_MS);
     });
     pad.addEventListener("pointermove", (e) => {
       const r = pad.getBoundingClientRect();
       px = e.clientX - r.left; py = e.clientY - r.top;
       if (!last) return;
+      if (longPressTimer && start) {
+        const mx = e.clientX - start.x, my = e.clientY - start.y;
+        if (Math.abs(mx) > 10 || Math.abs(my) > 10) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
       const dx = e.clientX - last.x;
       const dy = e.clientY - last.y;
       let dir = null;
@@ -551,7 +570,8 @@ class TvRemoteCard extends HTMLElement {
     const release = (e) => {
       active = false;
       stopRepeat();
-      if (start) {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      if (start && !longPressFired) {
         const dx = e.clientX - start.x;
         const dy = e.clientY - start.y;
         if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
@@ -575,6 +595,7 @@ class TvRemoteCard extends HTMLElement {
     pad.addEventListener("pointerleave", () => {
       if (!start) return;
       active = false; stopRepeat();
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
       start = null; last = null;
     });
 
