@@ -1,4 +1,4 @@
-const VERSION = "1.5.2";
+const VERSION = "1.7.0";
 
 const POWER_POLL_THROTTLE_MS = 800;
 const POWER_POLL_POST_TOGGLE_DELAYS = [1500, 3500, 6000];
@@ -254,7 +254,7 @@ class TvRemoteCard extends HTMLElement {
     const srcMatch = this._config.sources.find(s => s.source === tvSource);
     if (srcMatch) activeId = srcMatch.id;
     else if (adbAppId) {
-      const appMatch = this._config.apps.find(a => a.app_id === adbAppId);
+      const appMatch = this._config.apps.find(a => this._matchesAppId(a, adbAppId));
       if (appMatch) activeId = appMatch.id;
     }
     for (const el of this.shadowRoot.querySelectorAll(".app")) {
@@ -312,6 +312,14 @@ class TvRemoteCard extends HTMLElement {
       )
       .catch(() => {});
     this._setScreenOn(true);
+  }
+
+  _matchesAppId(item, appId) {
+    return String(item.app_id || "")
+      .split(",")
+      .map(id => id.trim())
+      .filter(Boolean)
+      .includes(appId);
   }
 
   _launchItem(item) {

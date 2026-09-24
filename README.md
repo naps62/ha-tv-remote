@@ -56,11 +56,17 @@ apps:                                   # remote.turn_on activity:... items
     color: "#244dd7"
     activity: org.jellyfin.androidtv
     app_id: org.jellyfin.androidtv
+  - id: moonlight
+    icon: mdi:moon-waning-crescent
+    color: "#5c6bc0"
+    activity: com.limelight
+    app_id: com.limelight
+  - id: smarttube
+    icon: mdi:youtube
+    color: "#ff0000"
+    activity: org.smarttube.stable
+    app_id: org.smarttube.stable, org.smarttube.beta, app.smarttube
 sources:                                # media_player.select_source items
-  - id: playstation
-    icon: mdi:sony-playstation
-    color: "#0070d1"
-    source: PS5 Game Console
 ```
 
 All keys except `entities.tv` and `entities.remote` are optional — omit `apps`
@@ -75,7 +81,7 @@ or `sources` to hide the row, omit `power_script` to fall back to
 | `icon` | yes | MDI icon (e.g. `mdi:spotify`) |
 | `color` | no | Hex string for the icon tint and active-pill background |
 | `activity` | yes | Value passed to `remote.turn_on activity:` on `entities.remote` |
-| `app_id` | no | Matched against `media_player.<adb>.app_id` to set the active-state highlight |
+| `app_id` | no | Matched against `media_player.<adb>.app_id` to set the active-state highlight. Use comma-separated IDs when an app has multiple package variants. |
 
 When you tap an app entry the card also fires `media_player.select_source` on
 `entities.tv` with `source: <shield_source>` so the TV switches back to the
